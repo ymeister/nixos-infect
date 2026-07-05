@@ -450,6 +450,9 @@ infect() {
     # stage 1 (where `/etc/NIXOS_LUSTRATE` is processed) does not run when using
     # `boot.loader.initScript.enable`. Do it in `/sbin/init` instead.
     wrapSbinInitToLustrate
+
+    # Change the root filesystem label to match `fileSystems."/".device`
+    tune2fs -L nixos /dev/disk/by-partlabel/ROOT
   fi
 }
 
