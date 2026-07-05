@@ -445,6 +445,62 @@ infect() {
     find $bootFs -depth ! -path $bootFs -exec rm -rf {} +
   fi
   /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+
+  if [ "$PROVIDER" = "android-terminal" ]; then
+    # stage 1 (where `/etc/NIXOS_LUSTRATE` is processed) does not run when using
+    # `boot.loader.initScript.enable`. Do it in `/sbin/init` instead.
+    wrapSbinInitToLustrate
+  fi
+}
+
+wrapSbinInitToLustrate() {
+  mv /sbin/init /sbin/init-unwrapped
+  echo bin/sh >> /etc/NIXOS_LUSTRATE
+  cat > /sbin/init << 'EOF'
+#!/nix/var/nix/profiles/system/sw/bin/bash
+export PATH=/nix/var/nix/profiles/system/sw/bin
+
+echo
+echo -e "\e[1;33m<<< nixos-infect is now lustrating the root filesystem (cruft goes to /old-root) >>>\e[0m"
+echo
+
+root=""
+mount /dev/vda / -o rw,remount
+
+mkdir -m 0755 -p "$root/old-root.tmp"
+
+echo
+echo "Moving impurities out of the way:"
+for d in "$root"/*
+do
+    [ "$d" == "$root/nix"          ] && continue
+    [ "$d" == "$root/boot"         ] && continue # Don't render the system unbootable
+    [ "$d" == "$root/old-root.tmp" ] && continue
+
+    mv -v "$d" "$root/old-root.tmp"
+done
+
+# Use .tmp to make sure subsequent invocations don't clash
+mv -v "$root/old-root.tmp" "$root/old-root"
+
+mkdir -m 0755 -p "$root/etc"
+touch "$root/etc/NIXOS"
+
+exec 4< "$root/old-root/etc/NIXOS_LUSTRATE"
+
+echo
+echo "Restoring selected impurities:"
+while read -u 4 keeper; do
+    dirname="$(dirname "$keeper")"
+    mkdir -m 0755 -p "$root/$dirname"
+    cp -av "$root/old-root/$keeper" "$root/$keeper"
+done
+
+mkdir -m 0755 -p /sbin
+mv /old-root/sbin/init-unwrapped /sbin/init
+exec sh /sbin/init
+EOF
+  chmod +x /sbin/init
 }
 
 if [ ! -v $PROVIDER ]; then
