@@ -398,7 +398,7 @@ infect() {
   nix-channel --remove nixpkgs
   nix-channel --add "https://nixos.org/channels/$NIX_CHANNEL" nixos
   if [ "$PROVIDER" = "android-terminal" ]; then
-    nix-channel --add https://github.com/yvt/nixos-avf/archive/refs/heads/android-17.tar.gz nixos-avf
+    nix-channel --add https://github.com/ymeister/nixos-avf/archive/refs/heads/android-17.tar.gz nixos-avf
   fi
   nix-channel --update
 
